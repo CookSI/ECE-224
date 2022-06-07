@@ -49,12 +49,17 @@ int main(){
 	if (mode == 1){
 		printf("Polling Mode Selected\n");
 		//push button
-		//while (IOWR(BUTTON_PIO_BASE,0) == 1);
+		printf("Press PB0 To Continue\n");
+		while (IOWR(BUTTON_PIO_BASE,0) == 1);
+		
 		polling();
 	}
 	else if (mode == 0) {
 		printf("Interrupt Mode Selected\n");
-		//while (IOWR(BUTTON_PIO_BASE,0) == 1);
+		
+		//push button
+		printf("Press PB0 To Continue\n");
+		while (IOWR(BUTTON_PIO_BASE,0) == 1);
 
 		interrupt();
 	}
