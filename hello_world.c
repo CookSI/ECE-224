@@ -20,13 +20,13 @@
 #include <altera_avalon_pio_regs.h>
 #include "altera_up_avalon_audio.h"
 #include "sys/alt_irq.h"
-#define LED0_ON_MASK 1
-#define LED0_OFF_MASK 14
-#define LED1_ON_MASK 2
-#define LED1_Off_MASK 13
-#define LED2_ON_MASK 4
-#define LED2_Off_MASK 11
-#define DEBUG
+//#define LED0_ON_MASK 1
+//#define LED0_OFF_MASK 14
+//#define LED1_ON_MASK 2
+//#define LED1_OFF_MASK 13
+//#define LED2_ON_MASK 4
+//#define LED2_OFF_MASK 11
+
 //Defines
 
 //Structs
@@ -46,7 +46,7 @@ int main(){
 
 	//Initial Registers & Vars
 
-    
+
 	int mode = IORD(SWITCH_PIO_BASE, 0) & 0x01;
 	printf("Mode is: %d\n", mode);
 
@@ -56,7 +56,7 @@ int main(){
 		printf("Polling Mode Selected\n");
 		//push button
 		printf("Press PB0 To Continue\n");
-		while (IORD(BUTTON_PIO_BASE,0) & 1 == 1); 
+		while (IORD(BUTTON_PIO_BASE,0) & 1 == 1);
 
 		polling();
 	}
@@ -66,7 +66,7 @@ int main(){
 		//push button
 		printf("Press PB0 To Continue\n");
 		while (IORD(BUTTON_PIO_BASE,0) & 1 == 1);
-        
+
 		interrupt();
 	}
 
@@ -78,43 +78,47 @@ int main(){
 static void interrupt_init(void* context, alt_u32 id){
 	// LED 2
      //led 1 on start of test
-    int led = IORD(LED_PIO_BASE, 0) | LED2_ON_MASK;
-    #ifdef DEBUG
-    IOWR(LED_PIO_BASE, 0, led);
-    #ifend
+    //int led = IORD(LED_PIO_BASE, 0) | 4;
 
-    
+    //IOWR(LED_PIO_BASE, 0, led);
+
+
+
     IOWR( RESPONSE_OUT_BASE, 0, 1);
 	IOWR( RESPONSE_OUT_BASE, 0, 0);
 	IOWR( STIMULUS_IN_BASE, 3, 0x0);
 
-    led = IORD(LED_PIO_BASE, 0) & LED2_OFF_MASK;
+    //led = IORD(LED_PIO_BASE, 0) & 11;
     //led 1 off
-    #ifdef DEBUG
-	IOWR(LED_PIO_BASE, 0, led);
-    #ifend
+
+	//IOWR(LED_PIO_BASE, 0, led);
+
 }
 
 
 //Interrupt Code
 void interrupt(){
-	
-    //led 1 on start of test
-    int led = IORD(LED_PIO_BASE, 0) | LED1_ON_MASK;
-    #ifdef DEBUG
-    IOWR(LED_PIO_BASE, 0, led);
-    #ifend
 
-    led = IORD(LED_PIO_BASE, 0) & LED1_OFF_MASK;
-    //led 1 off
-    #ifdef DEBUG
+	//led 1 on start of test
+	int led = IORD(LED_PIO_BASE, 0) | 2;
+
 	IOWR(LED_PIO_BASE, 0, led);
-    #ifend
-    
-    // Clear Pre-existing interrupt
-	IOWR(STIMULUS_IN_BASE, 3, 0);
+
+
+	led = IORD(LED_PIO_BASE, 0) & 13;
+	//led 1 off
+
+	IOWR(LED_PIO_BASE, 0, led);
+
+
+	// Clear Pre-existing interrupt
+//	IOWR(STIMULUS_IN_BASE, 3, 0);
 	//Interrupt initialize
 	alt_irq_register( STIMULUS_IN_IRQ, (void *)0, interrupt_init);
+
+	IOWR(LED_PIO_BASE, 0, 0x01);
+	IOWR(LED_PIO_BASE, 0, 0x00);
+
 
 	//ENABLE the Button_PIO_IR
 	IOWR( STIMULUS_IN_BASE, 2, 1);
@@ -126,7 +130,7 @@ void interrupt(){
 	int period = 2;
 	//for (period = 2; period < 5000; period+=2) {
 	while (period <= 5000){
-
+		int counter = 0;
 		IOWR(EGM_BASE, 0, 0);
 		IOWR(EGM_BASE, 2, period);
 		IOWR(EGM_BASE, 3, period/2);
@@ -135,14 +139,17 @@ void interrupt(){
 
 		while(IORD(EGM_BASE, 1)) {
 			//egm_busy = IORD(EGM_BASE, 1);
+			//led 0 on
 			background();
-			//counter++;
+			//led 0 off
+			counter++;
 		}
 		egm_average_latency = IORD(EGM_BASE, 4);
 		egm_missed = IORD(EGM_BASE, 5);
 		egm_multi = IORD(EGM_BASE, 6);
 		printf("Average Latency: %d, Missed: %d, Multi: %d\n", egm_average_latency, egm_missed, egm_multi);
 		printf("Period: %d\n", period);
+		printf("Tasks: %d\n", counter);
 
 		IOWR(EGM_BASE, 0, 1);
 		period += 2;
@@ -169,21 +176,23 @@ int background() {
 	int grainsize = 4;
 	int g_taskProcessed = 0;
 
+	//IOWR(LED_PIO_BASE, 0, 0x01);
+
     //led 0 on
-    int led = IORD(LED_PIO_BASE, 0) | LED0_ON_MASK;
-    #ifdef DEBUG
+    int led = IORD(LED_PIO_BASE, 0) | 1;
+
 	IOWR(LED_PIO_BASE, 0, led);
-    #ifend
+
 
 	for(j = 0; j < grainsize; j++) {
 		g_taskProcessed++;
 	}
 
-    led = IORD(LED_PIO_BASE, 0) & LED0_OFF_MASK;
+    led = IORD(LED_PIO_BASE, 0) & 14;
     //led 0 off
-    #ifdef DEBUG
+
 	IOWR(LED_PIO_BASE, 0, led);
-    #ifend
+
 
 	return x;
 }
@@ -191,26 +200,26 @@ int background() {
 void polling(){
 
     //led 1 on start of test
-    int led = IORD(LED_PIO_BASE, 0) | LED1_ON_MASK;
-    #ifdef DEBUG
-    IOWR(LED_PIO_BASE, 0, led);
-    #ifend
+    int led = IORD(LED_PIO_BASE, 0) | 2;
 
-    led = IORD(LED_PIO_BASE, 0) & LED1_OFF_MASK;
+    IOWR(LED_PIO_BASE, 0, led);
+
+
+    led = IORD(LED_PIO_BASE, 0) & 13;
     //led 1 off
-    #ifdef DEBUG
+
 	IOWR(LED_PIO_BASE, 0, led);
-    #ifend
+
 
 	//polling test for loop
 	int period = 2;
 
-	for(period = 540; period < 550; period += 2){
-		int initial = 0;
+	for(period = 2; period <= 5000; period += 2){
+		int initial = 1;
 		int tasks = 0;
-		int char_cycle = 1;
-		int curr = 0;
-		int prev = 0;
+		//int char_cycle = 1;
+		//int curr = 0;
+		int prev = 3;
 
 		int egm_average_latency1;
 		int egm_missed1;
@@ -219,39 +228,41 @@ void polling(){
 		egm_init(period);
 
 		IOWR(RESPONSE_OUT_BASE, 0, 0);
-
-		while(1 == 1){
-			if (IORD(STIMULUS_IN_BASE, 0) == 1){\
-                curr = IORD(STIMULUS_IN_BASE, 0);
-				prev = curr;
+		// prev is 1, curr is 0
+		while (1){
+			if ((initial == 1) && ((IORD(STIMULUS_IN_BASE, 0) == 1))){
+				initial--;
+				IOWR(RESPONSE_OUT_BASE, 0, 1);
+				IOWR(RESPONSE_OUT_BASE, 0, 0);
+				prev = 1;
 				break;
 			}
 		}
-		IOWR(RESPONSE_OUT_BASE, 0, 1);
-		IOWR(RESPONSE_OUT_BASE, 0, 0);
-		//When Curr is 1 and prev 1
-		while(prev == 1 && curr == 1)){
-            prev = curr;
-            curr = IORD(STIMULUS_IN_BASE, 0);
-            background();
+		// prev is 0, curr is 1
+		while(IORD(EGM_BASE, 1)){
+			background();
 			tasks++;
+			if ((IORD(STIMULUS_IN_BASE, 0) != 1) && (prev == 1)){
+				prev = 0;
+				break;
+			}
 		}
-        
-		//When curr is 0 and prev is 1 or both are 0 
-		while(!(prev == 0 && curr == 1))){
-            prev = curr;
-            curr = IORD(STIMULUS_IN_BASE, 0);
-            background();
-			tasks++;
+		// prev is 1, curr is 0
+		while (IORD(EGM_BASE, 1)){
+			if (IORD(STIMULUS_IN_BASE, 0) == 0){
+				background();
+				prev = 1;
+				tasks++;
+			}
+			if (((IORD(STIMULUS_IN_BASE, 0) == 1) || (IORD(EGM_BASE, 1) == 0)) && (prev == 1)){
+				break;
+			}
 		}
-        
+
 		//After characterization
-		//if (prev == 0 && curr == 1){
-		while(IORD(EGM_BASE, 1) || !(prev == 0 && curr == 1)){
-			if((IORD(EGM_BASE, 1)){
-                IOWR(RESPONSE_OUT_BASE, 0, 1);
-                IOWR(RESPONSE_OUT_BASE, 0, 0);
-            }
+		while(IORD(EGM_BASE, 1)){
+			IOWR(RESPONSE_OUT_BASE, 0, 1);
+			IOWR(RESPONSE_OUT_BASE, 0, 0);
 			int x;
 			for(x = 0; x < tasks; x++){
 				background();
@@ -263,7 +274,6 @@ void polling(){
 				}
 			}
 		}
-		//}
 		egm_average_latency1 = IORD(EGM_BASE, 4);
 		egm_missed1 = IORD(EGM_BASE, 5);
 		egm_multi1 = IORD(EGM_BASE, 6);
