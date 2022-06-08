@@ -50,19 +50,20 @@ int main(){
 		printf("Polling Mode Selected\n");
 		//push button
 		printf("Press PB0 To Continue\n");
-		while (IOWR(BUTTON_PIO_BASE,0) == 1);
-		
+		while (IORD(BUTTON_PIO_BASE,0) & 1 == 1);
+
 		polling();
 	}
 	else if (mode == 0) {
 		printf("Interrupt Mode Selected\n");
-		
+
 		//push button
 		printf("Press PB0 To Continue\n");
-		while (IOWR(BUTTON_PIO_BASE,0) == 1);
+		while (IORD(BUTTON_PIO_BASE,0) & 1 == 1);
 
 		interrupt();
 	}
+
 
 	return 0;
 }
@@ -81,10 +82,14 @@ void interrupt(){
 	IOWR(STIMULUS_IN_BASE, 3, 0);
 	//Interrupt initialize
 	alt_irq_register( STIMULUS_IN_IRQ, (void *)0, interrupt_init);
+
+	IOWR(LED_PIO_BASE, 0, 0x01);
+	IOWR(LED_PIO_BASE, 0, 0x00);
+
+
 	//ENABLE the Button_PIO_IR
 	IOWR( STIMULUS_IN_BASE, 2, 1);
 
-	int egm_busy;
 	int egm_average_latency;
 	int egm_missed;
 	int egm_multi;
@@ -111,8 +116,8 @@ void interrupt(){
 		egm_average_latency = IORD(EGM_BASE, 4);
 		egm_missed = IORD(EGM_BASE, 5);
 		egm_multi = IORD(EGM_BASE, 6);
-		printf("Average Latency: %d\nMissed: %d\nMulti: %d\n", egm_average_latency, egm_missed, egm_multi);
-		printf("%d\n", period);
+		printf("Average Latency: %d, Missed: %d, Multi: %d\n", egm_average_latency, egm_missed, egm_multi);
+		printf("Period: %d\n", period);
 
 		IOWR(EGM_BASE, 0, 1);
 		period += 2;
@@ -133,62 +138,227 @@ void egm_init(int period){
 	IOWR(EGM_BASE, 0, 1);
 }
 
-//Polling Code
-void polling(){
-
-	//polling test for loop
-	int period = 2;
-	for(period = 2; period <= 5000; period += 2){
-		//Characterization cycle to find # of bg tasks to run
-		int  num_bgtasks = 0;
-		int  safe_bgtasks = 0;
-		int signal_fell = 0;
-
-		egm_init(period);
-		while(1){
-
-				//if it is not a rising edge -> run bg_task and increment num_bgtasks
-				if(IORD(STIMULUS_IN_BASE, 0) == 0){
-					signal_fell = 1;
-				}
-				/*
-				 * start  end
-				 *  v      v
-				 * _|---___|---|_
-				 *     ^
-				 *   sig_fell
-				 * */
-				//if it is a rising edge of cycle respond and break
-				if(signal_fell && IORD(STIMULUS_IN_BASE, 0)){
-					IOWR( RESPONSE_OUT_BASE, 0, 1);
-					IOWR( RESPONSE_OUT_BASE, 0, 0);
-					IOWR( STIMULUS_IN_BASE, 3, 0x0);
-					if(num_bgtasks) safe_bgtasks = num_bgtasks-1;
-					break;
-				}
-
-				background();
-				num_bgtasks++;
-			}
-
-		printf("Safe Number Of Background Tasks: %d \n", safe_bgtasks);
-		// run tests with safe number of tasks
-
-
-	}
-}
-
-
-
-int background(){
+int background() {
 	int j;
 	int x = 0;
 	int grainsize = 4;
 	int g_taskProcessed = 0;
 
+    //led 0 on
+	IOWR(LED_PIO_BASE, 0, 0x01);
 	for(j = 0; j < grainsize; j++) {
 		g_taskProcessed++;
 	}
+    //led 0 off
+	IOWR(LED_PIO_BASE, 0, 0x00);
 
 	return x;
 }
+
+void polling(){
+
+	//polling test for loop
+	int period = 2;
+
+	for(period = 540; period < 550; period += 2){
+		int initial = 0;
+		int tasks = 0;
+		int char_cycle = 1;
+		int curr = 0;
+		int prev = 0;
+
+		int egm_average_latency1;
+		int egm_missed1;
+		int egm_multi1;
+
+		egm_init(period);
+
+		IOWR(RESPONSE_OUT_BASE, 0, 0);
+
+		while(1 == 1){
+			if (IORD(STIMULUS_IN_BASE, 0) == 1){\
+                curr = IORD(STIMULUS_IN_BASE, 0);
+				prev = curr;
+				break;
+			}
+		}
+		IOWR(RESPONSE_OUT_BASE, 0, 1);
+		IOWR(RESPONSE_OUT_BASE, 0, 0);
+		//When Curr is 1 and prev 1
+		while(prev == 1 && curr == 1)){
+            prev = curr;
+            curr = IORD(STIMULUS_IN_BASE, 0);
+            background();
+			tasks++;
+		}
+        
+		//When curr is 0 and prev is 1 or both are 0 
+		while(!(prev == 0 && curr == 1))){
+            prev = curr;
+            curr = IORD(STIMULUS_IN_BASE, 0);
+            background();
+			tasks++;
+		}
+        
+		//After characterization
+		//if (prev == 0 && curr == 1){
+		while(IORD(EGM_BASE, 1) || !(prev == 0 && curr == 1)){
+			if((IORD(EGM_BASE, 1)){
+                IOWR(RESPONSE_OUT_BASE, 0, 1);
+                IOWR(RESPONSE_OUT_BASE, 0, 0);
+            }
+			int x;
+			for(x = 0; x < tasks; x++){
+				background();
+			}
+			while(1){
+				//conditions for next period to continue
+				if ((IORD(STIMULUS_IN_BASE, 0) == 1) || (IORD(EGM_BASE, 1) == 0)){
+					break;
+				}
+			}
+		}
+		//}
+		egm_average_latency1 = IORD(EGM_BASE, 4);
+		egm_missed1 = IORD(EGM_BASE, 5);
+		egm_multi1 = IORD(EGM_BASE, 6);
+		printf("Average Latency: %d, Missed: %d, Multi: %d\n", egm_average_latency1, egm_missed1, egm_multi1);
+		printf("Period: %d\n", period);
+
+		IOWR(EGM_BASE, 0, 1);
+	}
+}
+
+
+//Polling Code
+//void polling(){
+//
+//	//polling test for loop
+//	int period = 2;
+//
+//	for(period = 2; period < 5000; period += 2){
+//		//int initial = 0;
+//		int tasks = 0;
+//		int char_cycle = 1;
+//		int curr = 0;
+//		int prev = 0;
+//		int test =0;
+//		int overall_tasks = 0;
+//
+//
+//		int egm_average_latency1;
+//		int egm_missed1;
+//		int egm_multi1;
+//
+//		egm_init(period);
+//
+//		IOWR(RESPONSE_OUT_BASE, 0, 0);
+//
+//		while((IORD(EGM_BASE, 1))){
+//				prev = curr;
+//				curr = IORD(STIMULUS_IN_BASE, 0);
+//				//characterization cycle
+//			  		if ((prev == 0) && (curr == 1)) {
+//			  			printf("Made it here");
+//						IOWR(RESPONSE_OUT_BASE, 0, 1);
+//						IOWR(RESPONSE_OUT_BASE, 0, 0);
+//						while(1 == 1){
+//							background();
+//							if(IORD(STIMULUS_IN_BASE, 0) == 1){
+//								break;
+//							}
+//							overall_tasks++;
+//							tasks++;
+//						}
+//						//printf("number of tasks we can execute: %d \n", tasks);
+//						char_cycle = 0;
+//					}
+//
+//			//The others
+//
+//
+//		}
+//
+//			egm_average_latency1 = IORD(EGM_BASE, 4);
+//			egm_missed1 = IORD(EGM_BASE, 5);
+//			egm_multi1 = IORD(EGM_BASE, 6);
+//			//printf("Average Latency: %d, Missed: %d, Multi: %d\n", egm_average_latency1, egm_missed1, egm_multi1);
+//			//printf("Period: %d\n", period);
+//
+//			IOWR(EGM_BASE, 0, 1);
+//	}
+//}
+//void polling(){
+//
+//	//polling test for loop
+//	int period = 2;
+//
+//	for(period = 2; period < 5000; period += 2){
+//		//int initial = 0;
+//		int tasks = 0;
+//		int char_cycle = 1;
+//		int curr = 0;
+//		int prev = 0;
+//		int test =0;
+//		int overall_tasks = 0;
+//
+//
+//		int egm_average_latency1;
+//		int egm_missed1;
+//		int egm_multi1;
+//
+//		egm_init(period);
+//
+//		IOWR(RESPONSE_OUT_BASE, 0, 0);
+//
+//		while((IORD(EGM_BASE, 1))){
+//				prev = curr;
+//				curr = IORD(STIMULUS_IN_BASE, 0);
+//				//characterization cycle
+//			  	if(char_cycle == 1){
+//			  		if ((prev == 0) && (curr == 1)) {
+//			  			printf("Made it here");
+//						IOWR(RESPONSE_OUT_BASE, 0, 1);
+//						IOWR(RESPONSE_OUT_BASE, 0, 0);
+//						while(1 == 1){
+//							background();
+//							if(IORD(STIMULUS_IN_BASE, 0) == 1){
+//								break;
+//							}
+//							overall_tasks++;
+//							tasks++;
+//						}
+//						//printf("number of tasks we can execute: %d \n", tasks);
+//						char_cycle = 0;
+//					}
+//			  	}else{ // Test Run
+//			  		//printf("number of tasks we can execute: %d \n", tasks);
+//			  		if ((prev == 0) && (curr == 1)) {
+//			  			printf("Made it here");
+//						IOWR(RESPONSE_OUT_BASE, 0, 1);
+//						IOWR(RESPONSE_OUT_BASE, 0, 0);
+//						int x;
+//						for(x = 0; x < tasks; x++){
+//							background();
+//							overall_tasks++;
+//						}
+//					}
+//			  		//break;
+//			  	}
+//			  	printf("number of tasks we can execute: %d \n", overall_tasks);
+//
+//			//The others
+//
+//
+//		}
+//
+//			egm_average_latency1 = IORD(EGM_BASE, 4);
+//			egm_missed1 = IORD(EGM_BASE, 5);
+//			egm_multi1 = IORD(EGM_BASE, 6);
+//			//printf("Average Latency: %d, Missed: %d, Multi: %d\n", egm_average_latency1, egm_missed1, egm_multi1);
+//			//printf("Period: %d\n", period);
+//
+//			IOWR(EGM_BASE, 0, 1);
+//	}
+//}
+
