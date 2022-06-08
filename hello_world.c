@@ -20,7 +20,13 @@
 #include <altera_avalon_pio_regs.h>
 #include "altera_up_avalon_audio.h"
 #include "sys/alt_irq.h"
-
+#define LED0_ON_MASK 1
+#define LED0_OFF_MASK 14
+#define LED1_ON_MASK 2
+#define LED1_Off_MASK 13
+#define LED2_ON_MASK 4
+#define LED2_Off_MASK 11
+#define DEBUG
 //Defines
 
 //Structs
@@ -40,7 +46,7 @@ int main(){
 
 	//Initial Registers & Vars
 
-
+    
 	int mode = IORD(SWITCH_PIO_BASE, 0) & 0x01;
 	printf("Mode is: %d\n", mode);
 
@@ -50,7 +56,7 @@ int main(){
 		printf("Polling Mode Selected\n");
 		//push button
 		printf("Press PB0 To Continue\n");
-		while (IORD(BUTTON_PIO_BASE,0) & 1 == 1);
+		while (IORD(BUTTON_PIO_BASE,0) & 1 == 1); 
 
 		polling();
 	}
@@ -60,7 +66,7 @@ int main(){
 		//push button
 		printf("Press PB0 To Continue\n");
 		while (IORD(BUTTON_PIO_BASE,0) & 1 == 1);
-
+        
 		interrupt();
 	}
 
@@ -70,22 +76,45 @@ int main(){
 
 //ISR
 static void interrupt_init(void* context, alt_u32 id){
-	IOWR( RESPONSE_OUT_BASE, 0, 1);
+	// LED 2
+     //led 1 on start of test
+    int led = IORD(LED_PIO_BASE, 0) | LED2_ON_MASK;
+    #ifdef DEBUG
+    IOWR(LED_PIO_BASE, 0, led);
+    #ifend
+
+    
+    IOWR( RESPONSE_OUT_BASE, 0, 1);
 	IOWR( RESPONSE_OUT_BASE, 0, 0);
 	IOWR( STIMULUS_IN_BASE, 3, 0x0);
+
+    led = IORD(LED_PIO_BASE, 0) & LED2_OFF_MASK;
+    //led 1 off
+    #ifdef DEBUG
+	IOWR(LED_PIO_BASE, 0, led);
+    #ifend
 }
 
 
 //Interrupt Code
 void interrupt(){
-	// Clear Pre-existing interrupt
+	
+    //led 1 on start of test
+    int led = IORD(LED_PIO_BASE, 0) | LED1_ON_MASK;
+    #ifdef DEBUG
+    IOWR(LED_PIO_BASE, 0, led);
+    #ifend
+
+    led = IORD(LED_PIO_BASE, 0) & LED1_OFF_MASK;
+    //led 1 off
+    #ifdef DEBUG
+	IOWR(LED_PIO_BASE, 0, led);
+    #ifend
+    
+    // Clear Pre-existing interrupt
 	IOWR(STIMULUS_IN_BASE, 3, 0);
 	//Interrupt initialize
 	alt_irq_register( STIMULUS_IN_IRQ, (void *)0, interrupt_init);
-
-	IOWR(LED_PIO_BASE, 0, 0x01);
-	IOWR(LED_PIO_BASE, 0, 0x00);
-
 
 	//ENABLE the Button_PIO_IR
 	IOWR( STIMULUS_IN_BASE, 2, 1);
@@ -106,11 +135,7 @@ void interrupt(){
 
 		while(IORD(EGM_BASE, 1)) {
 			//egm_busy = IORD(EGM_BASE, 1);
-			//led 0 on
-			IOWR(LED_PIO_BASE, 0, 0x01);
 			background();
-			//led 0 off
-			IOWR(LED_PIO_BASE, 0, 0x00);
 			//counter++;
 		}
 		egm_average_latency = IORD(EGM_BASE, 4);
@@ -145,17 +170,37 @@ int background() {
 	int g_taskProcessed = 0;
 
     //led 0 on
-	IOWR(LED_PIO_BASE, 0, 0x01);
+    int led = IORD(LED_PIO_BASE, 0) | LED0_ON_MASK;
+    #ifdef DEBUG
+	IOWR(LED_PIO_BASE, 0, led);
+    #ifend
+
 	for(j = 0; j < grainsize; j++) {
 		g_taskProcessed++;
 	}
+
+    led = IORD(LED_PIO_BASE, 0) & LED0_OFF_MASK;
     //led 0 off
-	IOWR(LED_PIO_BASE, 0, 0x00);
+    #ifdef DEBUG
+	IOWR(LED_PIO_BASE, 0, led);
+    #ifend
 
 	return x;
 }
 
 void polling(){
+
+    //led 1 on start of test
+    int led = IORD(LED_PIO_BASE, 0) | LED1_ON_MASK;
+    #ifdef DEBUG
+    IOWR(LED_PIO_BASE, 0, led);
+    #ifend
+
+    led = IORD(LED_PIO_BASE, 0) & LED1_OFF_MASK;
+    //led 1 off
+    #ifdef DEBUG
+	IOWR(LED_PIO_BASE, 0, led);
+    #ifend
 
 	//polling test for loop
 	int period = 2;
